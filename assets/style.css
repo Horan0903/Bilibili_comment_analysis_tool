@@ -1,0 +1,138 @@
+/* 全局样式 */
+.stApp {
+    max-width: 100%;
+    background-color: #f8f9fa;
+}
+
+/* 侧边栏样式 */
+.css-1d391kg {
+    background-color: #ffffff;
+    padding: 2rem 1rem;
+    border-right: 1px solid #e9ecef;
+}
+
+.sidebar .sidebar-content {
+    background-color: #ffffff;
+}
+
+/* 主内容区样式 */
+.main {
+    padding: 2rem;
+    background-color: #f8f9fa;
+}
+
+/* 卡片容器样式 */
+.stCardContainer {
+    background-color: #ffffff;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 1rem;
+}
+
+/* 标签页样式 */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 2rem;
+    background-color: #ffffff;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.stTabs [data-baseweb="tab"] {
+    height: 3rem;
+    padding: 0 1.5rem;
+    font-weight: 500;
+    color: #6c757d;
+}
+
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+    color: #1f77b4;
+    border-bottom: 2px solid #1f77b4;
+}
+
+/* 图表容器样式 */
+.chart-container {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* 指标卡片样式 */
+.metric-card {
+    background: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    text-align: center;
+}
+
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #1f77b4;
+}
+
+.metric-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* 评论卡片样式 */
+.comment-card {
+    background: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    border-left: 4px solid #1f77b4;
+}
+
+/* 搜索框样式 */
+.stTextInput > div > div {
+    background-color: white;
+    border-radius: 0.5rem;
+}
+
+/* 数据框样式 */
+.dataframe {
+    border: none !important;
+    background-color: white;
+    border-radius: 0.5rem;
+}
+
+/* 按钮样式 */
+.stButton > button {
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: #1f77b4;
+    color: white;
+}
+
+/* 提示信息样式 */
+.stAlert {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin: 1rem 0;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+} 
