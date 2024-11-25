@@ -8,6 +8,17 @@ import openai
 from datetime import datetime
 import os
 from openai import OpenAI
+import gensim
+from gensim import corpora
+import pyLDAvis
+import pyLDAvis.gensim_models
+import streamlit.components.v1 as components
+import jieba
+from sklearn.feature_extraction.text import CountVectorizer
+from gensim.matutils import Sparse2Corpus
+import io
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
 
 # 设置OpenAI API密钥
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -23,6 +34,108 @@ st.set_page_config(
 # 加载自定义CSS
 with open('assets/style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+# 添加停用词加函数
+def load_stopwords():
+    """加载停用词"""
+    try:
+        with open('LDA/Stopword.txt', encoding='utf-8') as f:
+            stopwords = set(line.strip() for line in f)
+        return stopwords
+    except FileNotFoundError:
+        st.warning("停用词文件未找到，将使用空的停用词集")
+        return set()
+
+# 添加文本预处理函数
+def preprocess_text(text, stopwords):
+    """文本预处理：分词并去除停用词"""
+    if not isinstance(text, str):
+        text = str(text) if isinstance(text, (float, int)) else ''
+    
+    seg = jieba.cut(text)
+    return ' '.join([i for i in seg if i not in stopwords])
+
+# 修改perform_lda_analysis函数
+@st.cache_data(show_spinner=False)
+def perform_lda_analysis(_texts, num_topics=5):
+    """
+    执行 LDA 主题建模分析
+    
+    Args:
+        _texts: 评论文本列表
+        num_topics: 主题数量
+    Returns:
+        lda_model: LDA模型
+        corpus: 文档-词项矩阵
+        dictionary: 词典
+    """
+    # 加载停用词
+    stopwords = load_stopwords()
+    
+    # 加载自定义词典
+    try:
+        user_dicts = [
+            "SogouLabDic.txt", "dict_baidu_utf8.txt", "dict_pangu.txt",
+            "dict_sougou_utf8.txt", "dict_tencent_utf8.txt", "my_dict.txt"
+        ]
+        for dict_path in user_dicts:
+            jieba.load_userdict(f"LDA/{dict_path}")
+    except FileNotFoundError:
+        st.warning("部分自定义词典未找到")
+    
+    # 文本预处理
+    processed_texts = [preprocess_text(text, stopwords) for text in _texts]
+    
+    # 使用CountVectorizer构建文档-词项矩阵
+    vectorizer = CountVectorizer(max_df=0.95, min_df=2)
+    doc_term_matrix = vectorizer.fit_transform(processed_texts)
+    
+    # 转换为gensim格式
+    corpus = Sparse2Corpus(doc_term_matrix, documents_columns=False)
+    dictionary = corpora.Dictionary.from_corpus(
+        corpus, 
+        id2word=dict(enumerate(vectorizer.get_feature_names_out()))
+    )
+    
+    # 训练LDA模型
+    lda_model = gensim.models.ldamodel.LdaModel(
+        corpus=corpus,
+        id2word=dictionary,
+        num_topics=num_topics,
+        random_state=42,
+        update_every=1,
+        passes=10,
+        alpha='auto',
+        per_word_topics=True
+    )
+    
+    return lda_model, corpus, dictionary
+
+# 修改词云生成函数的缓存装饰器
+@st.cache_data(show_spinner=False)
+def generate_topic_wordcloud(_lda_model, _dictionary):
+    """为每个主题生成词云"""
+    wordclouds = []
+    for idx, topic in enumerate(_lda_model.get_topics()):
+        word_freq = dict(zip(_dictionary.values(), topic))
+        wordcloud = WordCloud(
+            width=800, 
+            height=400, 
+            max_words=50,
+            font_path='LDA/Songti.ttc'  # 确保字体文件存在
+        ).generate_from_frequencies(word_freq)
+        
+        # 将词云图保存到内存
+        buf = io.BytesIO()
+        plt.figure(figsize=(10, 5))
+        plt.imshow(wordcloud, interpolation='bilinear')
+        plt.axis('off')
+        plt.title(f'主题 {idx + 1}')
+        plt.savefig(buf, format="png", bbox_inches='tight')
+        plt.close()
+        buf.seek(0)
+        wordclouds.append(buf)
+    return wordclouds
 
 def main():
     # 侧边栏
@@ -146,7 +259,7 @@ def main():
                 if df is not None and len(df) > 0:
                     st.success(f'成功获取 {len(df)} 条评论数据')
                     
-                    # 添加数据预览
+                    # 添加数预览
                     with st.expander("数据预览"):
                         st.dataframe(df.head(), use_container_width=True)
                         
@@ -258,7 +371,7 @@ def display_analysis(df):
     with tab2:
         st.header("情感分析")
         
-        # ��算情感分析结果
+        # 算情感分析结果
         with st.spinner('正在进行情感分析...'):
             sentiment_analysis = perform_sentiment_analysis(df)
             df['情感得分'] = sentiment_analysis['sentiment_scores']
@@ -387,6 +500,81 @@ def display_analysis(df):
                 keywords_df.head(20).style.background_gradient(cmap='YlOrRd'),
                 use_container_width=True
             )
+        
+        # 添加LDA主题建模部分
+        st.subheader("LDA主题建模分析")
+        
+        # 准备数据
+        column_name = "评论内容"  # 使用正确的列名
+        if column_name not in df.columns:
+            st.error(f"找不到列 '{column_name}'，请确保数据包含评论内容列")
+            return
+            
+        texts = df[column_name].tolist()
+        
+        # 添加主题数量选择器
+        num_topics = st.slider("选择主题数量", min_value=2, max_value=10, value=5)
+        
+        if st.button("开始LDA分析"):
+            with st.spinner("正在进行LDA主题建模分析..."):
+                # 执行LDA分析
+                lda_model, corpus, dictionary = perform_lda_analysis(texts, num_topics)
+                
+                # 显示主题词云
+                st.write("### 主题词云")
+                wordclouds = generate_topic_wordcloud(lda_model, dictionary)
+                for buf in wordclouds:
+                    st.image(buf, use_container_width=True)
+                
+                # 显示主题词分布
+                st.write("### 主题词分布")
+                cols = st.columns(num_topics)  # 创建与主题数量相同的列
+                for idx, (topic_num, topic) in enumerate(lda_model.print_topics(-1)):
+                    with cols[idx]:  # 在每个列中显示一个主题
+                        st.write(f'主题 {idx + 1}:')
+                        words = [(word.split('*')[1].strip().replace('"', ''), 
+                                 float(word.split('*')[0])) 
+                                for word in topic.split(' + ')]
+                        topic_df = pd.DataFrame(words, columns=['词语', '权重'])
+                        st.dataframe(topic_df)
+                
+                # 生成交互式可视化
+                vis_data = pyLDAvis.gensim_models.prepare(
+                    lda_model, corpus, dictionary, mds='mmds')
+                
+                # 翻译并显示HTML
+                html_string = pyLDAvis.prepared_data_to_html(vis_data)
+                translations = {
+                    "Topic": "主题",
+                    "Lambda": "λ 值",
+                    "Relevance": "关联度",
+                    "Overall term frequency": "整体词频",
+                    "Top 30 Most Salient Terms": "前30个最显著的词语",
+                    "Most relevant words for topic": "主题的相关词语",
+                }
+                for english, chinese in translations.items():
+                    html_string = html_string.replace(english, chinese)
+                
+                components.html(html_string, width=1300, height=800)
+                
+                # 主题分布热力图
+                doc_topics = []
+                for doc in corpus:
+                    topic_probs = lda_model.get_document_topics(doc)
+                    probs = [0] * num_topics
+                    for topic_id, prob in topic_probs:
+                        probs[topic_id] = prob
+                    doc_topics.append(probs)
+                
+                topic_dist_df = pd.DataFrame(doc_topics)
+                topic_dist_df.columns = [f'主题{i+1}' for i in range(num_topics)]
+                
+                fig = px.imshow(
+                    topic_dist_df.T,
+                    labels=dict(x="文档", y="主题", color="概率"),
+                    title="文档-主题分布热力图"
+                )
+                st.plotly_chart(fig)
         
         # 关键词搜索功能
         st.subheader("关键词搜索")
